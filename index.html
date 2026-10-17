@@ -315,7 +315,10 @@
     .result h1 { margin: 0; font-size: 29px; letter-spacing: -.04em; }
     .result-score { margin: 11px 0 0; color: var(--muted); font-size: 16px; }
     .result-score strong { color: var(--accent); font-size: 22px; }
+    .result-best { margin: 9px 0 0; color: var(--muted); font-size: 14px; }
+    .result-storage-note { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
     .result-message { max-width: 360px; margin: 16px auto 26px; color: var(--muted); }
+    .result h1:focus { outline: 3px solid color-mix(in srgb, var(--accent) 65%, transparent); outline-offset: 5px; }
 
     .card.reveal { animation: reveal 420ms cubic-bezier(.2, .8, .2, 1) both; }
 
@@ -449,6 +452,7 @@
     let current = 0;
     let score = 0;
     let answered = false;
+    const personalBestKey = "orbit-space-quiz-personal-best";
 
     function renderQuestion() {
       const item = questions[current];
@@ -509,17 +513,55 @@
             ? ["🪐", "Nice orbit!", "You've got a great start. There's always more to discover."]
             : ["🌱", "Future astronaut!", "Every great explorer starts with a first mission. Try again and reach for the stars!"];
 
+      let personalBest = null;
+      let storageNote = "";
+      let storage;
+      try {
+          storage = window.localStorage;
+      } catch {
+          storageNote = "Personal best is unavailable because browser storage could not be accessed.";
+      }
+
+      if (storage) {
+          let savedBest = null;
+          let storageReadable = true;
+          try {
+            const savedValue = storage.getItem(personalBestKey);
+            const parsedValue = savedValue === null ? NaN : Number(savedValue);
+            if (Number.isInteger(parsedValue) && parsedValue >= 0 && parsedValue <= questions.length) {
+              savedBest = parsedValue;
+            }
+          } catch {
+            storageReadable = false;
+            storageNote = "Personal best is unavailable because browser storage could not be read.";
+          }
+
+          if (storageReadable) {
+            personalBest = Math.max(savedBest ?? 0, score);
+            if (savedBest === null || personalBest > savedBest) {
+              try {
+                storage.setItem(personalBestKey, String(personalBest));
+              } catch {
+                storageNote = "This personal best could not be saved for future visits.";
+              }
+            }
+          }
+      }
+
       quiz.classList.add("reveal");
       quiz.innerHTML = `
-        <div class="result">
-          <div class="result-emoji" role="img" aria-label="${result[0]}">${result[0]}</div>
-          <p class="eyebrow">Mission complete</p>
-          <h1>${result[1]}</h1>
-          <p class="result-score">You scored <strong>${score} / ${questions.length}</strong></p>
-          <p class="result-message">${result[2]}</p>
-          <button class="restart-button" id="restart-button" type="button">Play again <span aria-hidden="true">↻</span></button>
-        </div>`;
+          <div class="result">
+            <div class="result-emoji" role="img" aria-label="${result[0]}">${result[0]}</div>
+            <p class="eyebrow">Mission complete</p>
+            <h1 tabindex="-1">${result[1]}</h1>
+            <p class="result-score">You scored <strong>${score} / ${questions.length}</strong></p>
+            <p class="result-best">Personal best: <strong>${personalBest === null ? "Unavailable" : `${personalBest} / ${questions.length}`}</strong></p>
+            ${storageNote ? `<p class="result-storage-note" role="status">${storageNote}</p>` : ""}
+            <p class="result-message">${result[2]}</p>
+            <button class="restart-button" id="restart-button" type="button">Play again <span aria-hidden="true">↻</span></button>
+          </div>`;
       footerNote.textContent = "The universe is always full of surprises.";
+      quiz.querySelector(".result h1").focus({ preventScroll: true });
       document.querySelector("#restart-button").addEventListener("click", () => window.location.reload());
     }
 
